@@ -1,3 +1,3 @@
-module github.com/laher/chainfs
+module github.com/laher/mergefs
 
-go 1.15
+go 1.16
