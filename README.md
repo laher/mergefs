@@ -9,4 +9,7 @@ A tiny go package which combines together fs.FS filesystems.
 
 # Related work
 
-This functionality is also bundled into [marshalfs](https://pkg.go.dev/github.com/laher/marshalfs). Mergefs is just a standalone Merge package.
+This functionality is also bundled into [marshalfs](https://pkg.go.dev/github.com/laher/marshalfs).
+ * [ ](
+ * [testfs](https://tip.golang.org/pkg/testing/fstest/) contains a memory-map implementation
+ * [s3fs](https://github.com/jszwec/s3fs) is a fs.FS backed by the AWS S3 client
