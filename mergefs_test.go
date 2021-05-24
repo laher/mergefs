@@ -13,8 +13,6 @@ import (
 
 func TestMergeFS(t *testing.T) {
 
-	is := is.New(t)
-
 	t.Run("testing different filesystems", func(t *testing.T) {
 		a := fstest.MapFS{"a": &fstest.MapFile{Data: []byte("text")}}
 		b := fstest.MapFS{"b": &fstest.MapFile{Data: []byte("text")}}
@@ -52,6 +50,7 @@ func TestMergeFS(t *testing.T) {
 	t.Run("testing mergefs.ReadDir", func(t *testing.T) {
 		for _, fp := range filePaths {
 			t.Run("testing path: "+fp.path, func(t *testing.T) {
+				is := is.New(t)
 				dirs, err := fs.ReadDir(filesystem, fp.path)
 				is.NoErr(err)
 				is.Equal(len(dirs), fp.dirArrayLength)
@@ -64,6 +63,7 @@ func TestMergeFS(t *testing.T) {
 	})
 
 	t.Run("testing mergefs.Open", func(t *testing.T) {
+		is := is.New(t)
 		data := make([]byte, 3)
 		file, err := filesystem.Open("a/z/bar.cue")
 		is.NoErr(err)
