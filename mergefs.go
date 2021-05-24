@@ -2,8 +2,9 @@ package mergefs
 
 import (
 	"errors"
-	"github.com/rs/zerolog/log"
+	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"sort"
 )
@@ -37,12 +38,14 @@ func (mfs MergedFS) Open(name string) (fs.File, error) {
 // filesystems
 func (mfs MergedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	dirsMap := make(map[string]fs.DirEntry)
+	notExistCount := 0
 	for _, filesystem := range mfs.filesystems {
 		if fsys, ok := filesystem.(fs.ReadDirFS); ok {
 			dir, err := fsys.ReadDir(name)
 			if err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
-					log.Debug().Msgf("directory in filepath %s was not found in filesystem", name)
+					notExistCount++
+					log.Printf("directory in filepath %s was not found in filesystem", name)
 					continue
 				}
 				return nil, err
@@ -57,7 +60,8 @@ func (mfs MergedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 		file, err := filesystem.Open(name)
 		if err != nil {
-			log.Debug().Msgf("filepath %s was not found in filesystem", name)
+			notExistCount++
+			log.Printf("filepath %s was not found in filesystem", name)
 			continue
 		}
 
@@ -66,19 +70,22 @@ func (mfs MergedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not implemented")}
 		}
 
-		fsDirs, err := dir.ReadDir(-1)
+		entries, err := dir.ReadDir(-1)
 		if err != nil {
 			return nil, err
 		}
-		sort.Slice(fsDirs, func(i, j int) bool { return fsDirs[i].Name() < fsDirs[j].Name() })
-		for _, v := range fsDirs {
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		for _, v := range entries {
 			if _, ok := dirsMap[v.Name()]; !ok {
 				dirsMap[v.Name()] = v
 			}
 		}
 		if err := file.Close(); err != nil {
-			log.Error().Msgf("failed to close file, err: %q", err)
+			return nil, fmt.Errorf("failed to close file: %q", err)
 		}
+	}
+	if len(mfs.filesystems) == notExistCount {
+		return nil, fs.ErrNotExist
 	}
 	dirs := make([]fs.DirEntry, 0, len(dirsMap))
 

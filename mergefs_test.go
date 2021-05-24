@@ -8,10 +8,12 @@ import (
 	"testing/fstest"
 
 	"github.com/laher/mergefs"
-	"github.com/stretchr/testify/require"
+	"github.com/matryer/is"
 )
 
 func TestMergeFS(t *testing.T) {
+
+	is := is.New(t)
 
 	t.Run("testing different filesystems", func(t *testing.T) {
 		a := fstest.MapFS{"a": &fstest.MapFile{Data: []byte("text")}}
@@ -51,11 +53,11 @@ func TestMergeFS(t *testing.T) {
 		for _, fp := range filePaths {
 			t.Run("testing path: "+fp.path, func(t *testing.T) {
 				dirs, err := fs.ReadDir(filesystem, fp.path)
-				require.NoError(t, err)
-				require.Len(t, dirs, fp.dirArrayLength)
+				is.NoErr(err)
+				is.Equal(len(dirs), fp.dirArrayLength)
 
 				for i := 0; i < len(dirs); i++ {
-					require.Equal(t, dirs[i].Name(), fp.child)
+					is.Equal(dirs[i].Name(), fp.child)
 				}
 			})
 		}
@@ -64,20 +66,20 @@ func TestMergeFS(t *testing.T) {
 	t.Run("testing mergefs.Open", func(t *testing.T) {
 		data := make([]byte, 3)
 		file, err := filesystem.Open("a/z/bar.cue")
-		require.NoError(t, err)
+		is.NoErr(err)
 
 		_, err = file.Read(data)
-		require.NoError(t, err)
-		require.Equal(t, "bar", string(data))
+		is.NoErr(err)
+		is.Equal("bar", string(data))
 
 		file, err = filesystem.Open("b/z/foo.cue")
-		require.NoError(t, err)
+		is.NoErr(err)
 
 		_, err = file.Read(data)
-		require.NoError(t, err)
-		require.Equal(t, "foo", string(data))
+		is.NoErr(err)
+		is.Equal("foo", string(data))
 
 		err = file.Close()
-		require.NoError(t, err)
+		is.NoErr(err)
 	})
 }
