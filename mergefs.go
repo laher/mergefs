@@ -1,7 +1,9 @@
 package mergefs
 
 import (
+	"errors"
 	"io/fs"
+	"log"
 	"os"
 )
 
@@ -24,4 +26,42 @@ func (mfs MergedFS) Open(name string) (fs.File, error) {
 		}
 	}
 	return nil, os.ErrNotExist
+}
+
+// ReadDir reads from the directory, and produces a DirEntry array of different
+// directories.
+//
+// It iterates through all different filesystems that exist in the mfs MergeFS
+// filesystem slice and it identifies overlapping directories that exist in different
+// filesystems
+func (mfs MergedFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	dirsMap := make(map[string]fs.DirEntry)
+	notExistCount := 0
+	for _, filesystem := range mfs.filesystems {
+		dir, err := fs.ReadDir(filesystem, name)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				notExistCount++
+				log.Printf("directory in filepath %s was not found in filesystem", name)
+				continue
+			}
+			return nil, err
+		}
+		for _, v := range dir {
+			if _, ok := dirsMap[v.Name()]; !ok {
+				dirsMap[v.Name()] = v
+			}
+		}
+		continue
+	}
+	if len(mfs.filesystems) == notExistCount {
+		return nil, fs.ErrNotExist
+	}
+	dirs := make([]fs.DirEntry, 0, len(dirsMap))
+
+	for _, value := range dirsMap {
+		dirs = append(dirs, value)
+	}
+
+	return dirs, nil
 }
