@@ -8,26 +8,63 @@ import (
 
 // Merge filesystems
 func Merge(filesystems ...fs.FS) fs.FS {
-	return MergedFS{filesystems: filesystems}
+	return MergedFS{filesystems: filesystems, allowErrors: []error{fs.ErrNotExist}}
+}
+
+type Options func(m MergedFS) MergedFS
+
+// AllowError provides a way to ignore certain errors
+func AllowError(err error) Options {
+	return func(m MergedFS) MergedFS {
+		m.allowErrors = append(m.allowErrors, err)
+		return m
+	}
+}
+
+func MergeWithOptions(o Options, filesystems ...fs.FS) fs.FS {
+	return o(MergedFS{filesystems: filesystems})
 }
 
 // MergedFS combines filesystems. Each filesystem can serve different paths. The first FS takes precedence
 type MergedFS struct {
 	filesystems []fs.FS
+	allowErrors []error
+}
+
+func (mfs MergedFS) allow(err error) bool {
+	for _, allowed := range mfs.allowErrors {
+		if errors.Is(err, allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // Open opens the named file.
-func (mfs MergedFS) Open(name string) (fs.File, error) {
-	for _, mfs := range mfs.filesystems {
+func (filesystem MergedFS) Open(name string) (fs.File, error) {
+	for _, mfs := range filesystem.filesystems {
 		file, err := mfs.Open(name)
 		if err == nil {
 			return file, nil
 		}
-		if e, ok := err.(*fs.PathError); ok {
-			if !errors.Is(e.Err, fs.ErrNotExist) {
-				return nil, err
-			}
+		if !filesystem.allow(err) {
+			return nil, err
 		}
+		/*
+			if e, ok := err.(*fs.PathError); ok {
+				if !errors.Allow(fs.Err) {
+
+				}
+				if !errors.Is(e.Err, fs.ErrNotExist) {
+					for _, aerr := range mfs.allowErrors {
+						if errors.Is(err, aerr) {
+							continue outer
+						}
+					}
+					return nil, err
+				}
+			}
+		*/
 	}
 	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 }
