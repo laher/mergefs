@@ -4,28 +4,69 @@ import (
 	"errors"
 	"io/fs"
 	"log"
-	"os"
 )
 
 // Merge filesystems
 func Merge(filesystems ...fs.FS) fs.FS {
-	return MergedFS{filesystems: filesystems}
+	return MergedFS{filesystems: filesystems, allowErrors: []error{fs.ErrNotExist}}
+}
+
+type Options func(m MergedFS) MergedFS
+
+// AllowError provides a way to ignore certain errors
+func AllowError(err error) Options {
+	return func(m MergedFS) MergedFS {
+		m.allowErrors = append(m.allowErrors, err)
+		return m
+	}
+}
+
+func MergeWithOptions(o Options, filesystems ...fs.FS) fs.FS {
+	return o(MergedFS{filesystems: filesystems})
 }
 
 // MergedFS combines filesystems. Each filesystem can serve different paths. The first FS takes precedence
 type MergedFS struct {
 	filesystems []fs.FS
+	allowErrors []error
+}
+
+func (mfs MergedFS) allow(err error) bool {
+	for _, allowed := range mfs.allowErrors {
+		if errors.Is(err, allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 // Open opens the named file.
-func (mfs MergedFS) Open(name string) (fs.File, error) {
-	for _, fs := range mfs.filesystems {
-		file, err := fs.Open(name)
-		if err == nil { // TODO should we return early when it's not an os.ErrNotExist? Should we offer options to decide this behaviour?
+func (filesystem MergedFS) Open(name string) (fs.File, error) {
+	for _, mfs := range filesystem.filesystems {
+		file, err := mfs.Open(name)
+		if err == nil {
 			return file, nil
 		}
+		if !filesystem.allow(err) {
+			return nil, err
+		}
+		/*
+			if e, ok := err.(*fs.PathError); ok {
+				if !errors.Allow(fs.Err) {
+
+				}
+				if !errors.Is(e.Err, fs.ErrNotExist) {
+					for _, aerr := range mfs.allowErrors {
+						if errors.Is(err, aerr) {
+							continue outer
+						}
+					}
+					return nil, err
+				}
+			}
+		*/
 	}
-	return nil, os.ErrNotExist
+	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 }
 
 // ReadDir reads from the directory, and produces a DirEntry array of different

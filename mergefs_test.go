@@ -25,6 +25,24 @@ func TestMergeFS(t *testing.T) {
 			t.Fatalf("file should exist")
 		}
 	})
+	t.Run("verify errors", func(t *testing.T) {
+		a := fstest.MapFS{"a": &fstest.MapFile{Data: []byte("text")}}
+		b := fstest.MapFS{"b": &fstest.MapFile{Data: []byte("text")}}
+		filesystem := mergefs.Merge(a, b)
+		_, err := filesystem.Open("b/d")
+		if err == nil {
+			t.Fatalf("file should not exist but nil error retuned")
+		}
+		if e, ok := err.(*fs.PathError); !ok {
+
+			t.Fatalf("file should not exist: %T: %#v", err, err)
+		} else {
+			if e.Err != fs.ErrNotExist {
+				t.Fatalf("error was not fs.ErrNotExist: %T", e.Err)
+			}
+		}
+		fstest.TestFS(filesystem, "a", "b/c")
+	})
 
 	var filePaths = []struct {
 		path           string
@@ -48,6 +66,7 @@ func TestMergeFS(t *testing.T) {
 	filesystem := mergefs.Merge(tempDir, a)
 
 	t.Run("testing mergefs.ReadDir", func(t *testing.T) {
+		is := is.New(t)
 		for _, fp := range filePaths {
 			t.Run("testing path: "+fp.path, func(t *testing.T) {
 				is := is.New(t)
