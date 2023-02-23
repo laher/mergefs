@@ -3,7 +3,6 @@ package mergefs
 import (
 	"errors"
 	"io/fs"
-	"log"
 	"os"
 )
 
@@ -42,7 +41,6 @@ func (mfs MergedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				notExistCount++
-				log.Printf("directory in filepath %s was not found in filesystem", name)
 				continue
 			}
 			return nil, err
